@@ -32,34 +32,6 @@ async function handleFormSubmit(event) {
   await fetchImages();
 }
 
-async function fetchImages() {
-  try {
-    const requestUrl = getRequestUrl(currentQuery, currentPage);
-    const response = await axios.get(requestUrl);
-    const { hits, totalHits } = response.data;
-
-    if (hits.length === 0) {
-      Notiflix.Notify.failure(
-        'Sorry, there are no images matching your search query. Please try again.'
-      );
-      hideLoadMoreButton();
-    } else {
-      makeMarkup(hits);
-      if (currentPage * PER_PAGE <= totalHits) {
-        showLoadMoreButton();
-      } else {
-        hideLoadMoreButton();
-        Notiflix.Notify.info("You've reached the end of search results.");
-      }
-    }
-  } catch (error) {
-    console.error(error);
-    Notiflix.Notify.failure(
-      'An error occurred while fetching images. Please try again later.'
-    );
-  }
-}
-
 function getRequestUrl(query, page) {
   const url = new URL(BASE_URL);
   url.searchParams.append('key', apiKey);
