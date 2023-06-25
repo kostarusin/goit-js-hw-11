@@ -1,5 +1,6 @@
+import { fetchImages } from './api';
 import Notiflix from 'notiflix';
-import axios from 'axios';
+
 import SimpleLightbox from 'simplelightbox';
 import 'simplelightbox/dist/simple-lightbox.min.css';
 
@@ -18,18 +19,46 @@ const refs = {
 
 let currentPage = 1;
 let currentQuery = '';
-
-refs.form.addEventListener('submit', handleFormSubmit);
-refs.loadMoreBtn.addEventListener('click', loadMoreImages);
+let requestUrl = '';
 
 async function handleFormSubmit(event) {
   event.preventDefault();
-
   currentQuery = refs.input.value.trim();
   currentPage = 1;
 
   clearGallery();
-  await fetchImages();
+  await fetchDataBySearch();
+}
+
+async function fetchDataBySearch() {
+  requestUrl = getRequestUrl(currentQuery, currentPage);
+
+  try {
+    const data = await fetchImages(requestUrl);
+    checkFetchResultBeforeRender(data);
+  } catch (error) {
+    Notiflix.Notify.failure(
+      'An error occurred while fetching images. Please try again later.'
+    );
+  }
+}
+
+function checkFetchResultBeforeRender(data) {
+  const { hits, totalHits } = data;
+  if (hits.length === 0) {
+    Notiflix.Notify.failure(
+      'Sorry, there are no images matching your search query. Please try again.'
+    );
+    hideLoadMoreButton();
+  } else {
+    makeMarkup(hits);
+    if (currentPage * PER_PAGE <= totalHits) {
+      showLoadMoreButton();
+    } else {
+      hideLoadMoreButton();
+      Notiflix.Notify.info("You've reached the end of search results.");
+    }
+  }
 }
 
 function getRequestUrl(query, page) {
@@ -58,24 +87,24 @@ function makeMarkup(images) {
       }) => {
         return `
         <a class="gallery__link" href="${largeImageURL}" target="_blank">
-    <div class="photo-card">
+          <div class="photo-card">
             <img src="${webformatURL}" alt="${tags}" loading="lazy" />
             <div class="info">
-            <p class="info-item">
-              <b>Likes</b> ${likes}
-            </p>
-            <p class="info-item">
-              <b>Views</b> ${views}
-            </p>
-            <p class="info-item">
-              <b>Comments</b> ${comments}
-            </p>
-            <p class="info-item">
-              <b>Downloads</b> ${downloads}
-            </p>
+              <p class="info-item">
+                <b>Likes</b> ${likes}
+              </p>
+              <p class="info-item">
+                <b>Views</b> ${views}
+              </p>
+              <p class="info-item">
+                <b>Comments</b> ${comments}
+              </p>
+              <p class="info-item">
+                <b>Downloads</b> ${downloads}
+              </p>
+            </div>
           </div>
-    </div>
-    </a>
+        </a>
       `;
       }
     )
@@ -101,7 +130,10 @@ function hideLoadMoreButton() {
   refs.loadMoreBtn.style.display = 'none';
 }
 
-function loadMoreImages() {
+async function loadMoreImages() {
   currentPage += 1;
-  fetchImages();
+  await fetchDataBySearch();
 }
+
+refs.form.addEventListener('submit', handleFormSubmit);
+refs.loadMoreBtn.addEventListener('click', loadMoreImages);
