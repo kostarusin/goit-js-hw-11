@@ -1,8 +1,12 @@
 import Notiflix from 'notiflix';
-const axios = require('axios').default;
+import axios from 'axios';
+import SimpleLightbox from 'simplelightbox';
+import 'simplelightbox/dist/simple-lightbox.min.css';
+
 import { apiKey } from './credentials';
 
 const BASE_URL = 'https://pixabay.com/api/';
+const PER_PAGE = 40;
 
 const refs = {
   form: document.querySelector('.search-form'),
@@ -12,30 +16,60 @@ const refs = {
   gallery: document.querySelector('.gallery'),
 };
 
-refs.form.addEventListener('submit', getRequestUrl);
+let currentPage = 1;
+let currentQuery = '';
 
-function getRequestUrl(event) {
+refs.form.addEventListener('submit', handleFormSubmit);
+refs.loadMoreBtn.addEventListener('click', loadMoreImages);
+
+async function handleFormSubmit(event) {
   event.preventDefault();
-  let searchValue = refs.input.value;
-  let requestUrl = `${BASE_URL}?key=${apiKey}&page=1&per_page=40&q=${searchValue}&image_type=photo&orientation=horizontal&safesearch=true`;
-  getImagesBySearch(requestUrl);
+
+  currentQuery = refs.input.value.trim();
+  currentPage = 1;
+
+  clearGallery();
+  await fetchImages();
 }
 
-async function getImagesBySearch(requestUrl) {
+async function fetchImages() {
   try {
+    const requestUrl = getRequestUrl(currentQuery, currentPage);
     const response = await axios.get(requestUrl);
-    const images = response.data.hits;
+    const { hits, totalHits } = response.data;
 
-    if (images.length === 0) {
+    if (hits.length === 0) {
       Notiflix.Notify.failure(
-        "We're sorry, but you've reached the end of search results."
+        'Sorry, there are no images matching your search query. Please try again.'
       );
+      hideLoadMoreButton();
     } else {
-      makeMarkup(images);
+      makeMarkup(hits);
+      if (currentPage * PER_PAGE <= totalHits) {
+        showLoadMoreButton();
+      } else {
+        hideLoadMoreButton();
+        Notiflix.Notify.info("You've reached the end of search results.");
+      }
     }
   } catch (error) {
     console.error(error);
+    Notiflix.Notify.failure(
+      'An error occurred while fetching images. Please try again later.'
+    );
   }
+}
+
+function getRequestUrl(query, page) {
+  const url = new URL(BASE_URL);
+  url.searchParams.append('key', apiKey);
+  url.searchParams.append('q', query);
+  url.searchParams.append('image_type', 'photo');
+  url.searchParams.append('orientation', 'horizontal');
+  url.searchParams.append('safesearch', 'true');
+  url.searchParams.append('page', page.toString());
+  url.searchParams.append('per_page', PER_PAGE.toString());
+  return url.toString();
 }
 
 function makeMarkup(images) {
@@ -50,26 +84,52 @@ function makeMarkup(images) {
         comments,
         downloads,
       }) => {
-        return `<div class="photo-card">
-    <img src="${webformatURL}" alt="${tags}" loading="lazy" />
-    <div class="info">
-      <p class="info-item">
-        <b>Likes</b> ${likes}
-      </p>
-      <p class="info-item">
-        <b>Views</b> ${views}
-      </p>
-      <p class="info-item">
-        <b>Comments</b> ${comments}
-      </p>
-      <p class="info-item">
-        <b>Downloads</b> ${downloads}
-      </p>
+        return `
+        <a class="gallery__link" href="${largeImageURL}" target="_blank">
+    <div class="photo-card">
+            <img src="${webformatURL}" alt="${tags}" loading="lazy" />
+            <div class="info">
+            <p class="info-item">
+              <b>Likes</b> ${likes}
+            </p>
+            <p class="info-item">
+              <b>Views</b> ${views}
+            </p>
+            <p class="info-item">
+              <b>Comments</b> ${comments}
+            </p>
+            <p class="info-item">
+              <b>Downloads</b> ${downloads}
+            </p>
+          </div>
     </div>
-  </div>`;
+    </a>
+      `;
       }
     )
     .join('');
-  refs.gallery.innerHTML = markup;
+
+  refs.gallery.insertAdjacentHTML('beforeend', markup);
+  const lightbox = new SimpleLightbox('.gallery a', {
+    captions: true,
+    captionsData: 'alt',
+    captionDelay: 250,
+  });
+}
+
+function clearGallery() {
+  refs.gallery.innerHTML = '';
+}
+
+function showLoadMoreButton() {
   refs.loadMoreBtn.style.display = 'block';
+}
+
+function hideLoadMoreButton() {
+  refs.loadMoreBtn.style.display = 'none';
+}
+
+function loadMoreImages() {
+  currentPage += 1;
+  fetchImages();
 }
