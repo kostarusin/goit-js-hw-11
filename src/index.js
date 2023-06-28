@@ -137,3 +137,5 @@ async function loadMoreImages() {
 
 refs.form.addEventListener('submit', handleFormSubmit);
 refs.loadMoreBtn.addEventListener('click', loadMoreImages);
+
+const fff = 2;
